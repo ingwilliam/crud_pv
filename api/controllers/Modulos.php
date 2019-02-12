@@ -46,11 +46,15 @@ $app = new Micro($di);
 // Recupera todos los registros
 $app->get('/select', function () use ($app) {
 
-    $phql = 'SELECT * FROM Modulos WHERE active = true ORDER BY nombre';
+    try {
+        $phql = 'SELECT * FROM Modulos WHERE active = true ORDER BY nombre';
 
-    $robots = $app->modelsManager->executeQuery($phql);
+        $robots = $app->modelsManager->executeQuery($phql);
 
-    echo json_encode($robots);
+        echo json_encode($robots);
+    } catch (Exception $ex) {
+        echo "error_metodo";
+    }            
 }
 );
 

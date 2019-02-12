@@ -190,30 +190,63 @@ $app->put('/edit/{id:[0-9]+}', function ($id) use ($app) {
 }
 );
 
-// Editar registro
+// Eliminar registro
 $app->delete('/delete/{id:[0-9]+}', function ($id) use ($app) {
     try {
-        // Consultar el usuario que se esta editando
-        $usuario = Usuarios::findFirst(json_decode($id));
-        $usuario->active = false;
-        if ($usuario->save($usuario) === false) {
+        //Instancio los objetos que se van a manejar
+        $request = new Request();
+        $tokens = new Tokens();
+
+        //Si el token existe y esta activo entra a realizar la tabla
+        if ($tokens->verificar_token($request->getPut('token'))) {
+            // Consultar el usuario que se esta editando
+            $usuario = Usuarios::findFirst(json_decode($id));
+            // Paso el usuario a inactivo
+            $usuario->active = false;
+            if ($usuario->save($usuario) === false) {
+                echo "error";
+            } else {
+                echo "ok";
+            }
+        }
+        else
+        {
             echo "error";
-        } else {
-            echo "ok";
         }
     } catch (Exception $ex) {
-        echo "error";
-    }    
+        echo "error_metodo";
+    }
 });
 
 // Editar registro
 $app->get('/search/{id:[0-9]+}', function ($id) use ($app) {
-    $phql = 'SELECT * FROM Usuarios WHERE id = :id:';
-    $usuario = $app->modelsManager->executeQuery($phql, ['id' => $id,])->getFirst();
-    $usuario->password = "undefined";
-    echo json_encode($usuario);
-}
-);
+    try {
+        //Instancio los objetos que se van a manejar
+        $request = new Request();
+        $tokens = new Tokens();
+
+        //Si el token existe y esta activo entra a realizar la tabla
+        if ($tokens->verificar_token($request->get('token'))) {
+            $phql = 'SELECT * FROM Usuarios WHERE id = :id:';
+            $usuario = Usuarios::findFirst($id);
+            $usuario->password = "undefined";
+            if (isset($usuario->id)) {
+                echo json_encode($usuario);            
+            } 
+            else 
+            {
+                echo "error";
+            }    
+        }
+        else
+        {
+            echo "error";
+        }                        
+    } catch (Exception $ex) {
+        //retorno el array en json null
+        echo "error_metodo";
+    }        
+});
 
 //Recupera todos los registros
 $app->post('/imageupload', function () use ($app) {
@@ -238,8 +271,7 @@ $app->post('/imageupload', function () use ($app) {
     } else {
         $ImageUpload->print_json(200, "Extension invalida", null);
     }
-}
-);
+});
 
 
 try {

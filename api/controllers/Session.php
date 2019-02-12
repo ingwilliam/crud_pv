@@ -76,7 +76,7 @@ $app->post('/iniciar_session', function () use ($app, $config) {
             $token_actual = array("token"=>$tokens->token, "usuario"=>$usuario_validar->primer_nombre." ".$usuario_validar->segundo_nombre." ".$usuario_validar->primer_apellido." ".$usuario_validar->segundo_apellido );            
             echo json_encode($token_actual);
         } else {
-            echo "false";
+            echo "error";
         }
     } else {
         // To protect against timing attacks. Regardless of whether a user

@@ -45,11 +45,26 @@ $app = new Micro($di);
 // Recupera todos los registros
 $app->get('/select', function () use ($app) {
 
-    $phql = 'SELECT * FROM Tiposdocumentos WHERE active = TRUE ORDER BY nombre';
+    try {
+        //Instancio los objetos que se van a manejar
+        $request = new Request();
+        $tokens = new Tokens();
 
-    $robots = $app->modelsManager->executeQuery($phql);
+        //Si el token existe y esta activo entra a realizar la tabla
+        if ($tokens->verificar_token($request->get('token'))) {
+            $phql = 'SELECT * FROM Tiposdocumentos WHERE active = TRUE ORDER BY nombre';
 
-    echo json_encode($robots);
+            $robots = $app->modelsManager->executeQuery($phql);
+
+            echo json_encode($robots);
+        }
+        else
+        {
+            echo "error";
+        }
+    } catch (Exception $ex) {
+        echo "error_metodo";
+    }
 }
 );
 
