@@ -54,8 +54,11 @@ $app->get('/all', function () use ($app) {
         $request = new Request();
         $tokens = new Tokens();
 
+        //Consulto si al menos hay un token
+        $token_actual = $tokens->verificar_token($request->get('token'));
+        
         //Si el token existe y esta activo entra a realizar la tabla
-        if ($tokens->verificar_token($request->get('token'))) {
+        if ($token_actual>0) {
             //Defino columnas para el orden desde la tabla html
             $columns = array(
                 0 => 'td.nombre',
@@ -122,70 +125,110 @@ $app->get('/all', function () use ($app) {
 }
 );
 
-// Crear registro
+//Crear registro actual
 $app->post('/new', function () use ($app) {
 
-    $post = $app->request->getPost();
-    $usuario = new Usuarios();
-    $usuario->active = true;
-    $post["password"] = $this->security->hash($post["password"]);
+    try {
+        //Instancio los objetos que se van a manejar
+        $request = new Request();
+        $tokens = new Tokens();
 
-    $usuario_validar = Usuarios::findFirst("tipo_documento = '" . $post["tipo_documento"] . "' AND numero_documento = '" . $post["numero_documento"] . "'");
+        //Consulto si al menos hay un token
+        $token_actual = $tokens->verificar_token($request->getPut('token'));
+        
+        //Si el token existe y esta activo entra a realizar la tabla
+        if ($token_actual>0) {
+            $post = $app->request->getPost();
+            $usuario = new Usuarios();
+            $usuario->active = true;
+            $post["password"] = $this->security->hash($post["password"]);
 
-    if (isset($usuario_validar->id)) {
-        echo "error_registro";
-    } else {
-        $usuario_validar = Usuarios::findFirst("username = '" . $post["username"] . "'");
+            $usuario_validar = Usuarios::findFirst("tipo_documento = '" . $post["tipo_documento"] . "' AND numero_documento = '" . $post["numero_documento"] . "'");
 
-        if (isset($usuario_validar->id)) {
-            echo "error_username";
-        } else {
-            if ($usuario->save($post) === false) {
-                echo "error";
+            if (isset($usuario_validar->id)) {
+                echo "error_registro";
             } else {
-                echo $usuario->id;
+                $usuario_validar = Usuarios::findFirst("username = '" . $post["username"] . "'");
+
+                if (isset($usuario_validar->id)) {
+                    echo "error_username";
+                } else {
+                    //Consulto el usuario actual
+                    $user_current = json_decode($token_actual->user_current,true);
+                    $post["creado_por"]=$user_current["id"];
+                    $post["fecha_creacion"]=date("Y-m-d H:i:s");
+                    if ($usuario->save($post) === false) {
+                        echo "error";
+                    } else {
+                        echo $usuario->id;
+                    }
+                }
             }
+        } else {
+            echo "error";
         }
+    } catch (Exception $ex) {
+        echo "error_metodo";
     }
 }
 );
 
-// Editar registro
+// Editar registro actual
 $app->put('/edit/{id:[0-9]+}', function ($id) use ($app) {
-    $usuario = $app->request->getPut();
-    if ($usuario["password"] != null && $usuario["password"] != "" && $usuario["password"] != "undefined") {
-        $usuario["password"] = $this->security->hash($usuario["password"]);
-    } else {
-        unset($usuario["password"]);
-    }
-    // Consultar el usuario que se esta editando
-    $usuario_original = Usuarios::findFirst(json_decode($id));
+    try {
+        //Instancio los objetos que se van a manejar
+        $request = new Request();
+        $tokens = new Tokens();
 
-    if (isset($usuario_original->id)) {
-
-        if (( $usuario_original->tipo_documento != $usuario["tipo_documento"] ) || ( $usuario_original->numero_documento != $usuario["numero_documento"] )) {
-            $usuario_validar = Usuarios::findFirst("tipo_documento = '" . $usuario["tipo_documento"] . "' AND numero_documento = '" . $usuario["numero_documento"] . "'");
-        }
-
-        if (isset($usuario_validar->id)) {
-            echo "error_registro";
-        } else {
-            if ($usuario_original->username != $usuario["username"]) {
-                $usuario_validar = Usuarios::findFirst("username = '" . $usuario["username"] . "'");
-            }
-
-            if (isset($usuario_validar->id)) {
-                echo "error_username";
+        //Consulto si al menos hay un token
+        $token_actual = $tokens->verificar_token($request->getPut('token'));
+        
+        //Si el token existe y esta activo entra a realizar la tabla
+        if ($token_actual>0) {
+            $usuario = $app->request->getPut();
+            if ($usuario["password"] != null && $usuario["password"] != "" && $usuario["password"] != "undefined") {
+                $usuario["password"] = $this->security->hash($usuario["password"]);
             } else {
-                if ($usuario_original->save($usuario) === false) {
-                    echo "error";
-                } else {
-                    echo $id;
-                }
+                unset($usuario["password"]);
             }
+            // Consultar el usuario que se esta editando
+            $usuario_original = Usuarios::findFirst(json_decode($id));
+
+            if (isset($usuario_original->id)) {
+
+                if (( $usuario_original->tipo_documento != $usuario["tipo_documento"] ) || ( $usuario_original->numero_documento != $usuario["numero_documento"] )) {
+                    $usuario_validar = Usuarios::findFirst("tipo_documento = '" . $usuario["tipo_documento"] . "' AND numero_documento = '" . $usuario["numero_documento"] . "'");
+                }
+
+                if (isset($usuario_validar->id)) {
+                    echo "error_registro";
+                } else {
+                    if ($usuario_original->username != $usuario["username"]) {
+                        $usuario_validar = Usuarios::findFirst("username = '" . $usuario["username"] . "'");
+                    }
+
+                    if (isset($usuario_validar->id)) {
+                        echo "error_username";
+                    } else {
+                        //Consulto el usuario actual
+                        $user_current = json_decode($token_actual->user_current,true);
+                        $usuario["actualizado_por"]=$user_current["id"];
+                        $usuario["fecha_actualizacion"]=date("Y-m-d H:i:s");
+                        if ($usuario_original->save($usuario) === false) {
+                            echo "error";
+                        } else {
+                            echo $id;
+                        }
+                    }
+                }
+            } else {
+                echo "error";
+            }
+        } else {
+            echo "error";
         }
-    } else {
-        echo "error";
+    } catch (Exception $ex) {
+        echo "error_metodo";
     }
 }
 );
@@ -197,8 +240,11 @@ $app->delete('/delete/{id:[0-9]+}', function ($id) use ($app) {
         $request = new Request();
         $tokens = new Tokens();
 
+        //Consulto si al menos hay un token
+        $token_actual = $tokens->verificar_token($request->getPut('token'));
+        
         //Si el token existe y esta activo entra a realizar la tabla
-        if ($tokens->verificar_token($request->getPut('token'))) {
+        if ($token_actual>0) {
             // Consultar el usuario que se esta editando
             $usuario = Usuarios::findFirst(json_decode($id));
             // Paso el usuario a inactivo
@@ -208,9 +254,7 @@ $app->delete('/delete/{id:[0-9]+}', function ($id) use ($app) {
             } else {
                 echo "ok";
             }
-        }
-        else
-        {
+        } else {
             echo "error";
         }
     } catch (Exception $ex) {
@@ -218,34 +262,33 @@ $app->delete('/delete/{id:[0-9]+}', function ($id) use ($app) {
     }
 });
 
-// Editar registro
+// Cargo el registro
 $app->get('/search/{id:[0-9]+}', function ($id) use ($app) {
     try {
         //Instancio los objetos que se van a manejar
         $request = new Request();
         $tokens = new Tokens();
 
+        //Consulto si al menos hay un token
+        $token_actual = $tokens->verificar_token($request->get('token'));
+        
         //Si el token existe y esta activo entra a realizar la tabla
-        if ($tokens->verificar_token($request->get('token'))) {
+        if ($token_actual>0) {
             $phql = 'SELECT * FROM Usuarios WHERE id = :id:';
             $usuario = Usuarios::findFirst($id);
             $usuario->password = "undefined";
             if (isset($usuario->id)) {
-                echo json_encode($usuario);            
-            } 
-            else 
-            {
+                echo json_encode($usuario);
+            } else {
                 echo "error";
-            }    
-        }
-        else
-        {
+            }
+        } else {
             echo "error";
-        }                        
+        }
     } catch (Exception $ex) {
         //retorno el array en json null
         echo "error_metodo";
-    }        
+    }
 });
 
 //Recupera todos los registros

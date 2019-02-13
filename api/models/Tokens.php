@@ -17,7 +17,7 @@ class Tokens extends Model {
             $tokens = Tokens::findFirst("'" . $fecha_actual . "' BETWEEN date_create AND date_limit AND token = '" . $token . "'");
             //Verifico si existe para retornar
             if (isset($tokens->id)) {
-                return true;
+                return $tokens;
             } else {
                 return false;
             }

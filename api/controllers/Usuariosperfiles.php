@@ -1,4 +1,5 @@
 <?php
+
 //error_reporting(E_ALL);
 //ini_set('display_errors', '1');
 use Phalcon\Loader;
@@ -44,28 +45,62 @@ $app = new Micro($di);
 
 // Recupera todos los registros
 $app->post('/new', function () use ($app) {
+    try {
+        //Instancio los objetos que se van a manejar
+        $request = new Request();
+        $tokens = new Tokens();
 
-    $post = $app->request->getPost();    
-    $user = new Usuariosperfiles();    
-    if ($user->save($post) === false) {
-        echo "error";
-    } else {
-        echo $user->id;
+        //Consulto si al menos hay un token
+        $token_actual = $tokens->verificar_token($request->getPost('token'));
+
+        //Si el token existe y esta activo entra a realizar la tabla
+        if ($token_actual > 0) {
+
+            $post = $app->request->getPost();
+            $user = new Usuariosperfiles();
+            if ($user->save($post) === false) {
+                echo "error";
+            } else {
+                echo $user->id;
+            }
+        } else {
+            echo "error";
+        }
+    } catch (Exception $ex) {
+        echo "error_metodo";
     }
 }
 );
 
 // Editar registro
-$app->delete('/delete/{user:[0-9]+}/{profile:[0-9]+}', function ($user,$profile) use ($app) {        
-    // Consultar el usuario que se esta editando
-    $user=Usuariosperfiles::find("usuario = ".$user." AND perfil=".$profile);    
+$app->delete('/delete/{user:[0-9]+}/{profile:[0-9]+}', function ($user, $profile) use ($app) {
+    try {
+        //Instancio los objetos que se van a manejar
+        $request = new Request();
+        $tokens = new Tokens();
 
-    if ($user->delete() === false) {
-        echo "error";
-    }else{
-        echo "ok";
-    }        
-                
+        //Consulto si al menos hay un token
+        $token_actual = $tokens->verificar_token($request->getPut('token'));
+
+        //Si el token existe y esta activo entra a realizar la tabla
+        if ($token_actual > 0) {
+
+            // Consultar el usuario que se esta editando
+            $user = Usuariosperfiles::find("usuario = " . $user . " AND perfil=" . $profile);
+
+            if ($user->delete() === false) {
+                echo "error";
+            } else {
+                echo "ok";
+            }
+        } 
+        else 
+        {
+            echo "error";
+        }
+    } catch (Exception $ex) {
+        echo "error_metodo";
+    }
 });
 
 

@@ -1,4 +1,5 @@
 <?php
+
 //error_reporting(E_ALL);
 //ini_set('display_errors', '1');
 use Phalcon\Loader;
@@ -53,58 +54,75 @@ $app->get('/select', function () use ($app) {
 }
 );
 
-// Recupera todos los registros
+// Recupera todos los perfiles seleccionados de un usuario determinado
 $app->get('/select_user/{id:[0-9]+}', function ($id) use ($app) {
 
-    $phql = 'SELECT p.id,p.nombre,up.id AS checked FROM Perfiles AS p LEFT JOIN Usuariosperfiles AS up ON p.id = up.perfil AND up.usuario='.$id.' WHERE p.active = true ORDER BY p.nombre';
-    
-    $robots = $app->modelsManager->executeQuery($phql);
+    try {
+        //Instancio los objetos que se van a manejar
+        $request = new Request();
+        $tokens = new Tokens();
 
-    echo json_encode($robots);
+        //Consulto si al menos hay un token
+        $token_actual = $tokens->verificar_token($request->get('token'));
+        
+        //Si el token existe y esta activo entra a realizar la tabla
+        if ($token_actual>0) {
+
+            $phql = 'SELECT p.id,p.nombre,up.id AS checked FROM Perfiles AS p LEFT JOIN Usuariosperfiles AS up ON p.id = up.perfil AND up.usuario=' . $id . ' WHERE p.active = true ORDER BY p.nombre';
+
+            $perfiles_usuario = $app->modelsManager->executeQuery($phql);
+
+            echo json_encode($perfiles_usuario);
+        } else {
+            echo "error";
+        }
+    } catch (Exception $ex) {
+        echo "error_metodo";
+    }
 }
 );
 
 // Recupera todos los registros
 $app->get('/all', function () use ($app) {
-    
+
     $request = new Request();
-    
+
     //Defino columnas para el orden desde la tabla html
-    $columns = array( 
-            0 =>'u.nombre',            
+    $columns = array(
+        0 => 'u.nombre',
     );
-        
-    $where .=" WHERE u.active=true";
+
+    $where .= " WHERE u.active=true";
     //Condiciones para la consulta
-    
-    if( !empty($request->get("search")['value']) ) {               
-            $where .=" AND ( UPPER(".$columns[0].") LIKE '%".strtoupper($request->get("search")['value'])."%' )";
+
+    if (!empty($request->get("search")['value'])) {
+        $where .= " AND ( UPPER(" . $columns[0] . ") LIKE '%" . strtoupper($request->get("search")['value']) . "%' )";
     }
 
     //Defino el sql del total y el array de datos
     $sqlTot = "SELECT count(*) as total FROM Perfiles AS u";
-    $sqlRec = "SELECT ".$columns[0]." , concat('<button type=\"button\" class=\"btn btn-warning\" onclick=\"form_edit(',u.id,')\"><span class=\"glyphicon glyphicon-edit\"></span></button><button type=\"button\" class=\"btn btn-danger\" onclick=\"form_del(',u.id,')\"><span class=\"glyphicon glyphicon-remove\"></span></button>') as acciones FROM Perfiles AS u";
-    
-    //concatenate search sql if value exist
-    if(isset($where) && $where != '') {
+    $sqlRec = "SELECT " . $columns[0] . " , concat('<button type=\"button\" class=\"btn btn-warning\" onclick=\"form_edit(',u.id,')\"><span class=\"glyphicon glyphicon-edit\"></span></button><button type=\"button\" class=\"btn btn-danger\" onclick=\"form_del(',u.id,')\"><span class=\"glyphicon glyphicon-remove\"></span></button>') as acciones FROM Perfiles AS u";
 
-            $sqlTot .= $where;
-            $sqlRec .= $where;
+    //concatenate search sql if value exist
+    if (isset($where) && $where != '') {
+
+        $sqlTot .= $where;
+        $sqlRec .= $where;
     }
-    
+
     //Concateno el orden y el limit para el paginador
-    $sqlRec .=  " ORDER BY ". $columns[$request->get('order')[0]['column']]."   ".$request->get('order')[0]['dir']."  LIMIT ".$request->get('length')." offset ".$request->get('start')." ";
-    
+    $sqlRec .= " ORDER BY " . $columns[$request->get('order')[0]['column']] . "   " . $request->get('order')[0]['dir'] . "  LIMIT " . $request->get('length') . " offset " . $request->get('start') . " ";
+
     //ejecuto el total de registros actual
     $totalRecords = $app->modelsManager->executeQuery($sqlTot)->getFirst();
-    
+
     //creo el array
     $json_data = array(
-			"draw"            => intval( $request->get("draw") ),   
-			"recordsTotal"    => intval( $totalRecords["total"] ),  
-			"recordsFiltered" => intval($totalRecords["total"]),
-			"data"            => $app->modelsManager->executeQuery($sqlRec)   // total data array
-			);
+        "draw" => intval($request->get("draw")),
+        "recordsTotal" => intval($totalRecords["total"]),
+        "recordsFiltered" => intval($totalRecords["total"]),
+        "data" => $app->modelsManager->executeQuery($sqlRec)   // total data array
+    );
     //retorno el array en json
     echo json_encode($json_data);
 }
@@ -114,8 +132,8 @@ $app->get('/all', function () use ($app) {
 $app->post('/new', function () use ($app) {
 
     $post = $app->request->getPost();
-    $user = new Perfiles();    
-    $user->active=true;    
+    $user = new Perfiles();
+    $user->active = true;
     if ($user->save($post) === false) {
         echo "error";
     } else {
@@ -126,35 +144,35 @@ $app->post('/new', function () use ($app) {
 
 // Editar registro
 $app->put('/edit/{id:[0-9]+}', function ($id) use ($app) {
-        $user = $app->request->getPut();                    
-        // Consultar el usuario que se esta editando
-        $user2=Perfiles::findFirst(json_decode($id));
-        if ($user2->save($user) === false) {
-            echo "error";
-        }else{
-            echo $id;
-        }
+    $user = $app->request->getPut();
+    // Consultar el usuario que se esta editando
+    $user2 = Perfiles::findFirst(json_decode($id));
+    if ($user2->save($user) === false) {
+        echo "error";
+    } else {
+        echo $id;
     }
+}
 );
 
 // Editar registro
-$app->delete('/delete/{id:[0-9]+}', function ($id) use ($app) {        
+$app->delete('/delete/{id:[0-9]+}', function ($id) use ($app) {
     // Consultar el usuario que se esta editando
-    $user=Perfiles::findFirst(json_decode($id));    
-    $user->active=false;
+    $user = Perfiles::findFirst(json_decode($id));
+    $user->active = false;
     if ($user->save($user) === false) {
         echo "error";
-    }else{
+    } else {
         echo json_encode($user);
-    }            
+    }
 });
 
 // Editar registro
-$app->get('/search/{id:[0-9]+}', function ($id) use ($app) {        
-        $phql = 'SELECT * FROM Perfiles WHERE id = :id:';
-        $user = $app->modelsManager->executeQuery($phql,['id' => $id,])->getFirst();
-        echo json_encode($user);
-    }
+$app->get('/search/{id:[0-9]+}', function ($id) use ($app) {
+    $phql = 'SELECT * FROM Perfiles WHERE id = :id:';
+    $user = $app->modelsManager->executeQuery($phql, ['id' => $id,])->getFirst();
+    echo json_encode($user);
+}
 );
 
 

@@ -50,8 +50,11 @@ $app->get('/select', function () use ($app) {
         $request = new Request();
         $tokens = new Tokens();
 
+        //Consulto si al menos hay un token
+        $token_actual = $tokens->verificar_token($request->get('token'));
+        
         //Si el token existe y esta activo entra a realizar la tabla
-        if ($tokens->verificar_token($request->get('token'))) {
+        if ($token_actual>0) {
             $phql = 'SELECT * FROM Tiposdocumentos WHERE active = TRUE ORDER BY nombre';
 
             $robots = $app->modelsManager->executeQuery($phql);
