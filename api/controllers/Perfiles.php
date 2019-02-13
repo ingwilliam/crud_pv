@@ -45,12 +45,29 @@ $app = new Micro($di);
 
 // Recupera todos los registros
 $app->get('/select', function () use ($app) {
+    try {
+        //Instancio los objetos que se van a manejar
+        $request = new Request();
+        $tokens = new Tokens();
 
-    $phql = 'SELECT * FROM Perfiles WHERE active = true ORDER BY nombre';
+        //Consulto si al menos hay un token
+        $token_actual = $tokens->verificar_token($request->get('token'));
+        
+        //Si el token existe y esta activo entra a realizar la tabla
+        if ($token_actual>0) {
+            $phql = 'SELECT * FROM Perfiles WHERE active = true ORDER BY nombre';
 
-    $robots = $app->modelsManager->executeQuery($phql);
+            $robots = $app->modelsManager->executeQuery($phql);
 
-    echo json_encode($robots);
+            echo json_encode($robots);
+        }
+        else
+        {
+            echo "error";
+        }
+    } catch (Exception $ex) {
+        echo "error_metodo";
+    }
 }
 );
 

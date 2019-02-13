@@ -56,9 +56,9 @@ $app->get('/all', function () use ($app) {
 
         //Consulto si al menos hay un token
         $token_actual = $tokens->verificar_token($request->get('token'));
-        
+
         //Si el token existe y esta activo entra a realizar la tabla
-        if ($token_actual>0) {
+        if ($token_actual > 0) {
             //Defino columnas para el orden desde la tabla html
             $columns = array(
                 0 => 'td.nombre',
@@ -135,9 +135,9 @@ $app->post('/new', function () use ($app) {
 
         //Consulto si al menos hay un token
         $token_actual = $tokens->verificar_token($request->getPut('token'));
-        
+
         //Si el token existe y esta activo entra a realizar la tabla
-        if ($token_actual>0) {
+        if ($token_actual > 0) {
             $post = $app->request->getPost();
             $usuario = new Usuarios();
             $usuario->active = true;
@@ -154,9 +154,9 @@ $app->post('/new', function () use ($app) {
                     echo "error_username";
                 } else {
                     //Consulto el usuario actual
-                    $user_current = json_decode($token_actual->user_current,true);
-                    $post["creado_por"]=$user_current["id"];
-                    $post["fecha_creacion"]=date("Y-m-d H:i:s");
+                    $user_current = json_decode($token_actual->user_current, true);
+                    $post["creado_por"] = $user_current["id"];
+                    $post["fecha_creacion"] = date("Y-m-d H:i:s");
                     if ($usuario->save($post) === false) {
                         echo "error";
                     } else {
@@ -182,9 +182,9 @@ $app->put('/edit/{id:[0-9]+}', function ($id) use ($app) {
 
         //Consulto si al menos hay un token
         $token_actual = $tokens->verificar_token($request->getPut('token'));
-        
+
         //Si el token existe y esta activo entra a realizar la tabla
-        if ($token_actual>0) {
+        if ($token_actual > 0) {
             $usuario = $app->request->getPut();
             if ($usuario["password"] != null && $usuario["password"] != "" && $usuario["password"] != "undefined") {
                 $usuario["password"] = $this->security->hash($usuario["password"]);
@@ -211,9 +211,9 @@ $app->put('/edit/{id:[0-9]+}', function ($id) use ($app) {
                         echo "error_username";
                     } else {
                         //Consulto el usuario actual
-                        $user_current = json_decode($token_actual->user_current,true);
-                        $usuario["actualizado_por"]=$user_current["id"];
-                        $usuario["fecha_actualizacion"]=date("Y-m-d H:i:s");
+                        $user_current = json_decode($token_actual->user_current, true);
+                        $usuario["actualizado_por"] = $user_current["id"];
+                        $usuario["fecha_actualizacion"] = date("Y-m-d H:i:s");
                         if ($usuario_original->save($usuario) === false) {
                             echo "error";
                         } else {
@@ -242,9 +242,9 @@ $app->delete('/delete/{id:[0-9]+}', function ($id) use ($app) {
 
         //Consulto si al menos hay un token
         $token_actual = $tokens->verificar_token($request->getPut('token'));
-        
+
         //Si el token existe y esta activo entra a realizar la tabla
-        if ($token_actual>0) {
+        if ($token_actual > 0) {
             // Consultar el usuario que se esta editando
             $usuario = Usuarios::findFirst(json_decode($id));
             // Paso el usuario a inactivo
@@ -271,9 +271,9 @@ $app->get('/search/{id:[0-9]+}', function ($id) use ($app) {
 
         //Consulto si al menos hay un token
         $token_actual = $tokens->verificar_token($request->get('token'));
-        
+
         //Si el token existe y esta activo entra a realizar la tabla
-        if ($token_actual>0) {
+        if ($token_actual > 0) {
             $phql = 'SELECT * FROM Usuarios WHERE id = :id:';
             $usuario = Usuarios::findFirst($id);
             $usuario->password = "undefined";

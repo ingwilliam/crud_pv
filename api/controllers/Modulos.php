@@ -54,55 +54,79 @@ $app->get('/select', function () use ($app) {
         echo json_encode($robots);
     } catch (Exception $ex) {
         echo "error_metodo";
-    }            
+    }
 }
 );
 
-// Recupera todos los registros
+//Permite cargar el HTML para la seguridad de los roles, perfiles y modulos
 $app->get('/seguridad', function () use ($app) {
 
-    $phql = 'SELECT * FROM Modulos WHERE active = true ORDER BY nombre';
-    $modulos = $app->modelsManager->executeQuery($phql);
+    try {
+        //Instancio los objetos que se van a manejar
+        $request = new Request();
+        $tokens = new Tokens();
 
-    $phql = 'SELECT * FROM Perfiles WHERE active = true ORDER BY nombre';
-    $perfiles = $app->modelsManager->executeQuery($phql);
+        //Consulto si al menos hay un token
+        $token_actual = $tokens->verificar_token($request->get('token'));
 
-    $phql = 'SELECT * FROM Permisos WHERE active = true ORDER BY nombre';
-    $permisos = $app->modelsManager->executeQuery($phql);
-    foreach ($modulos as $clave => $valor) {
-        ?>
-        <tr>
-            <td><?php echo $valor->nombre; ?></td>
-            <?php
-            foreach ($perfiles as $claveint => $valorint) {
+        //Si el token existe y esta activo entra a realizar la tabla
+        if ($token_actual > 0) {
+
+            //Consultar todos los modulos
+            $phql = 'SELECT * FROM Modulos WHERE active = true ORDER BY nombre';
+            $modulos = $app->modelsManager->executeQuery($phql);
+
+            //Consultar todos los perfiles
+            $phql = 'SELECT * FROM Perfiles WHERE active = true ORDER BY nombre';
+            $perfiles = $app->modelsManager->executeQuery($phql);
+
+            //Consultar todos los permisos
+            $phql = 'SELECT * FROM Permisos WHERE active = true ORDER BY nombre';
+            $permisos = $app->modelsManager->executeQuery($phql);
+
+            //Creo el html
+            foreach ($modulos as $clave => $valor) {
                 ?>
-                <td>
-                    <select onchange="genera_permisos(this.value, <?php echo $clave; ?>, <?php echo $claveint; ?>)">
-                        <option value="0">::Seleccionar Permiso::</option>
-                        <?php
-                        foreach ($permisos as $claveint2 => $valorint2) {
-                            $permiso_actual = 0;
-                            
-                            $phql = 'SELECT permiso FROM Moduloperfilpermisos WHERE perfil = "'.$valorint->id.'" AND modulo = "'.$valor->id.'"';
-                            
-                            $permiso_actual = $app->modelsManager->executeQuery($phql);
-                            
-                            if ($permiso_actual == $claveint2)
-                                $selected = "selected";
-                            else
-                                $selected = "";
-                            ?>
-                            <option value="<?php echo $claveint2; ?>" <?php echo $selected; ?>><?php echo $valorint2->nombre; ?></option>
-                            <?php
-                        }
+                <tr>
+                    <td><?php echo $valor->nombre; ?></td>
+                    <?php
+                    foreach ($perfiles as $claveint => $valorint) {
                         ?>
-                    </select>                                        
-                </td>
+                        <td>
+                            <select title="<?php echo $valor->id; ?>" dir="<?php echo $valorint->id; ?>" class="select_permisos">
+                                <option value="0">::Seleccionar Permiso::</option>
+                                <?php
+                                foreach ($permisos as $claveint2 => $valorint2) {
+                                    $permiso_actual = 0;
+
+                                    $phql = "SELECT permiso FROM Moduloperfilpermisos WHERE perfil = '" . $valorint->id . "' AND modulo = '" . $valor->id . "'";
+
+                                    $permiso_actual = $app->modelsManager->executeQuery($phql);
+
+                                    if ($permiso_actual->permiso == $valorint2->id)
+                                        $selected = "selected";
+                                    else
+                                        $selected = "";
+                                    ?>
+                                    <option value="<?php echo $valorint2->id; ?>" <?php echo $selected; ?>><?php print_r($valorint2->nombre); ?></option>
+                                    <?php
+                                }
+                                ?>
+                            </select>                                        
+                        </td>
+                        <?php
+                    }
+                    ?>
+                </tr>
                 <?php
             }
-            ?>
-        </tr>
-        <?php
+        }
+        else 
+        {
+            echo "error";
+        }
+    } catch (Exception $ex) {
+        echo "error_metodo";
     }
 }
 );
