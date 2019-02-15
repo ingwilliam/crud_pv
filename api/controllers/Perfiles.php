@@ -52,17 +52,15 @@ $app->get('/select', function () use ($app) {
 
         //Consulto si al menos hay un token
         $token_actual = $tokens->verificar_token($request->get('token'));
-        
+
         //Si el token existe y esta activo entra a realizar la tabla
-        if ($token_actual>0) {
+        if ($token_actual > 0) {
             $phql = 'SELECT * FROM Perfiles WHERE active = true ORDER BY nombre';
 
             $robots = $app->modelsManager->executeQuery($phql);
 
             echo json_encode($robots);
-        }
-        else
-        {
+        } else {
             echo "error";
         }
     } catch (Exception $ex) {
@@ -72,7 +70,7 @@ $app->get('/select', function () use ($app) {
 );
 
 // Recupera todos los perfiles seleccionados de un usuario determinado
-$app->get('/select_user/{id:[0-9]+}', function ($id) use ($app) {
+$app->get('/select_user/{id:[0-9]+}', function ($id) use ($app, $config) {
 
     try {
         //Instancio los objetos que se van a manejar
@@ -81,15 +79,29 @@ $app->get('/select_user/{id:[0-9]+}', function ($id) use ($app) {
 
         //Consulto si al menos hay un token
         $token_actual = $tokens->verificar_token($request->get('token'));
-        
+
         //Si el token existe y esta activo entra a realizar la tabla
-        if ($token_actual>0) {
+        if ($token_actual > 0) {
 
-            $phql = 'SELECT p.id,p.nombre,up.id AS checked FROM Perfiles AS p LEFT JOIN Usuariosperfiles AS up ON p.id = up.perfil AND up.usuario=' . $id . ' WHERE p.active = true ORDER BY p.nombre';
+            //Realizo una peticion curl por post para verificar si tiene permisos de escritura
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $config->sistema->url_curl . "Session/permiso_escritura");
+            curl_setopt($ch, CURLOPT_POST, 2);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, "modulo=" . $request->get('modulo') . "&token=" . $request->get('token'));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            $permiso_escritura = curl_exec($ch);
+            curl_close($ch);
 
-            $perfiles_usuario = $app->modelsManager->executeQuery($phql);
+            //Verifico que la respuesta es ok, para poder realizar la escritura
+            if ($permiso_escritura == "ok") {
+                $phql = 'SELECT p.id,p.nombre,up.id AS checked FROM Perfiles AS p LEFT JOIN Usuariosperfiles AS up ON p.id = up.perfil AND up.usuario=' . $id . ' WHERE p.active = true ORDER BY p.nombre';
 
-            echo json_encode($perfiles_usuario);
+                $perfiles_usuario = $app->modelsManager->executeQuery($phql);
+
+                echo json_encode($perfiles_usuario);
+            } else {
+                echo "acceso_denegado";
+            }
         } else {
             echo "error";
         }
@@ -102,93 +114,232 @@ $app->get('/select_user/{id:[0-9]+}', function ($id) use ($app) {
 // Recupera todos los registros
 $app->get('/all', function () use ($app) {
 
-    $request = new Request();
+    try {
+        //Instancio los objetos que se van a manejar
+        $request = new Request();
+        $tokens = new Tokens();
 
-    //Defino columnas para el orden desde la tabla html
-    $columns = array(
-        0 => 'u.nombre',
-    );
+        //Consulto si al menos hay un token
+        $token_actual = $tokens->verificar_token($request->get('token'));
 
-    $where .= " WHERE u.active=true";
-    //Condiciones para la consulta
+        //Si el token existe y esta activo entra a realizar la tabla
+        if ($token_actual > 0) {
 
-    if (!empty($request->get("search")['value'])) {
-        $where .= " AND ( UPPER(" . $columns[0] . ") LIKE '%" . strtoupper($request->get("search")['value']) . "%' )";
+            //Defino columnas para el orden desde la tabla html
+            $columns = array(
+                0 => 'u.nombre',
+            );
+
+            $where .= " WHERE u.active=true";
+            //Condiciones para la consulta
+
+            if (!empty($request->get("search")['value'])) {
+                $where .= " AND ( UPPER(" . $columns[0] . ") LIKE '%" . strtoupper($request->get("search")['value']) . "%' )";
+            }
+
+            //Defino el sql del total y el array de datos
+            $sqlTot = "SELECT count(*) as total FROM Perfiles AS u";
+            $sqlRec = "SELECT " . $columns[0] . " , concat('<button type=\"button\" class=\"btn btn-warning\" onclick=\"form_edit(',u.id,')\"><span class=\"glyphicon glyphicon-edit\"></span></button><button type=\"button\" class=\"btn btn-danger\" onclick=\"form_del(',u.id,')\"><span class=\"glyphicon glyphicon-remove\"></span></button>') as acciones FROM Perfiles AS u";
+
+            //concatenate search sql if value exist
+            if (isset($where) && $where != '') {
+
+                $sqlTot .= $where;
+                $sqlRec .= $where;
+            }
+
+            //Concateno el orden y el limit para el paginador
+            $sqlRec .= " ORDER BY " . $columns[$request->get('order')[0]['column']] . "   " . $request->get('order')[0]['dir'] . "  LIMIT " . $request->get('length') . " offset " . $request->get('start') . " ";
+
+            //ejecuto el total de registros actual
+            $totalRecords = $app->modelsManager->executeQuery($sqlTot)->getFirst();
+
+            //creo el array
+            $json_data = array(
+                "draw" => intval($request->get("draw")),
+                "recordsTotal" => intval($totalRecords["total"]),
+                "recordsFiltered" => intval($totalRecords["total"]),
+                "data" => $app->modelsManager->executeQuery($sqlRec)   // total data array
+            );
+            //retorno el array en json
+            echo json_encode($json_data);
+        } else {
+            //retorno el array en json null
+            echo json_encode(null);
+        }
+    } catch (Exception $ex) {
+        //retorno el array en json null
+        echo json_encode(null);
     }
-
-    //Defino el sql del total y el array de datos
-    $sqlTot = "SELECT count(*) as total FROM Perfiles AS u";
-    $sqlRec = "SELECT " . $columns[0] . " , concat('<button type=\"button\" class=\"btn btn-warning\" onclick=\"form_edit(',u.id,')\"><span class=\"glyphicon glyphicon-edit\"></span></button><button type=\"button\" class=\"btn btn-danger\" onclick=\"form_del(',u.id,')\"><span class=\"glyphicon glyphicon-remove\"></span></button>') as acciones FROM Perfiles AS u";
-
-    //concatenate search sql if value exist
-    if (isset($where) && $where != '') {
-
-        $sqlTot .= $where;
-        $sqlRec .= $where;
-    }
-
-    //Concateno el orden y el limit para el paginador
-    $sqlRec .= " ORDER BY " . $columns[$request->get('order')[0]['column']] . "   " . $request->get('order')[0]['dir'] . "  LIMIT " . $request->get('length') . " offset " . $request->get('start') . " ";
-
-    //ejecuto el total de registros actual
-    $totalRecords = $app->modelsManager->executeQuery($sqlTot)->getFirst();
-
-    //creo el array
-    $json_data = array(
-        "draw" => intval($request->get("draw")),
-        "recordsTotal" => intval($totalRecords["total"]),
-        "recordsFiltered" => intval($totalRecords["total"]),
-        "data" => $app->modelsManager->executeQuery($sqlRec)   // total data array
-    );
-    //retorno el array en json
-    echo json_encode($json_data);
 }
 );
 
 // Crear registro
-$app->post('/new', function () use ($app) {
+$app->post('/new', function () use ($app, $config) {
 
-    $post = $app->request->getPost();
-    $user = new Perfiles();
-    $user->active = true;
-    if ($user->save($post) === false) {
-        echo "error";
-    } else {
-        echo $user->id;
+    try {
+        //Instancio los objetos que se van a manejar
+        $request = new Request();
+        $tokens = new Tokens();
+
+        //Consulto si al menos hay un token
+        $token_actual = $tokens->verificar_token($request->getPut('token'));
+
+        //Si el token existe y esta activo entra a realizar la tabla
+        if ($token_actual > 0) {
+
+            //Realizo una peticion curl por post para verificar si tiene permisos de escritura
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $config->sistema->url_curl . "Session/permiso_escritura");
+            curl_setopt($ch, CURLOPT_POST, 2);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, "modulo=" . $request->getPut('modulo') . "&token=" . $request->getPut('token'));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            $permiso_escritura = curl_exec($ch);
+            curl_close($ch);
+
+            //Verifico que la respuesta es ok, para poder realizar la escritura
+            if ($permiso_escritura == "ok") {
+                //Consulto el usuario actual
+                $user_current = json_decode($token_actual->user_current, true);
+                $post = $app->request->getPost();
+                $perfil = new Perfiles();
+                $perfil->creado_por = $user_current["id"];
+                $perfil->fecha_creacion = date("Y-m-d H:i:s");
+                $perfil->active = true;
+                if ($perfil->save($post) === false) {
+                    echo "error";
+                } else {
+                    echo $perfil->id;
+                }
+            } else {
+                echo "acceso_denegado";
+            }
+        } else {
+            echo "error";
+        }
+    } catch (Exception $ex) {
+        echo "error_metodo";
     }
 }
 );
 
 // Editar registro
-$app->put('/edit/{id:[0-9]+}', function ($id) use ($app) {
-    $user = $app->request->getPut();
-    // Consultar el usuario que se esta editando
-    $user2 = Perfiles::findFirst(json_decode($id));
-    if ($user2->save($user) === false) {
-        echo "error";
-    } else {
-        echo $id;
+$app->put('/edit/{id:[0-9]+}', function ($id) use ($app, $config) {
+    try {
+        //Instancio los objetos que se van a manejar
+        $request = new Request();
+        $tokens = new Tokens();
+
+        //Consulto si al menos hay un token
+        $token_actual = $tokens->verificar_token($request->getPut('token'));
+
+        //Si el token existe y esta activo entra a realizar la tabla
+        if ($token_actual > 0) {
+
+            //Realizo una peticion curl por post para verificar si tiene permisos de escritura
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $config->sistema->url_curl . "Session/permiso_escritura");
+            curl_setopt($ch, CURLOPT_POST, 2);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, "modulo=" . $request->getPut('modulo') . "&token=" . $request->getPut('token'));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            $permiso_escritura = curl_exec($ch);
+            curl_close($ch);
+
+            //Verifico que la respuesta es ok, para poder realizar la escritura
+            if ($permiso_escritura == "ok") {
+                //Consulto el usuario actual
+                $user_current = json_decode($token_actual->user_current, true);
+                $put = $app->request->getPut();
+                // Consultar el usuario que se esta editando
+                $perfil = Perfiles::findFirst(json_decode($id));
+                $perfil->actualizado_por = $user_current["id"];
+                $perfil->fecha_actualizacion = date("Y-m-d H:i:s");
+                if ($perfil->save($put) === false) {
+                    echo "error";
+                } else {
+                    echo $id;
+                }
+            } else {
+                echo "acceso_denegado";
+            }
+        } else {
+            echo "error";
+        }
+    } catch (Exception $ex) {
+        echo "error_metodo";
     }
 }
 );
 
 // Editar registro
-$app->delete('/delete/{id:[0-9]+}', function ($id) use ($app) {
-    // Consultar el usuario que se esta editando
-    $user = Perfiles::findFirst(json_decode($id));
-    $user->active = false;
-    if ($user->save($user) === false) {
-        echo "error";
-    } else {
-        echo json_encode($user);
+$app->delete('/delete/{id:[0-9]+}', function ($id) use ($app, $config) {
+    try {
+        //Instancio los objetos que se van a manejar
+        $request = new Request();
+        $tokens = new Tokens();
+        //Consulto si al menos hay un token
+        $token_actual = $tokens->verificar_token($request->getPut('token'));
+
+        //Si el token existe y esta activo entra a realizar la tabla
+        if ($token_actual > 0) {
+
+            //Realizo una peticion curl por post para verificar si tiene permisos de escritura
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $config->sistema->url_curl . "Session/permiso_escritura");
+            curl_setopt($ch, CURLOPT_POST, 2);
+            curl_setopt($ch, CURLOPT_POSTFIELDS, "modulo=" . $request->getPut('modulo') . "&token=" . $request->getPut('token'));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            $permiso_escritura = curl_exec($ch);
+            curl_close($ch);
+
+            //Verifico que la respuesta es ok, para poder realizar la escritura
+            if ($permiso_escritura == "ok") {
+                // Consultar el usuario que se esta editando
+                $user = Perfiles::findFirst(json_decode($id));
+                $user->active = false;
+                if ($user->save($user) === false) {
+                    echo "error";
+                } else {
+                    echo "ok";
+                }
+            } else {
+                echo "acceso_denegado";
+            }
+
+            exit;
+        } else {
+            echo "error";
+        }
+    } catch (Exception $ex) {
+        echo "error_metodo";
     }
 });
 
-// Editar registro
+//Busca el registro
 $app->get('/search/{id:[0-9]+}', function ($id) use ($app) {
-    $phql = 'SELECT * FROM Perfiles WHERE id = :id:';
-    $user = $app->modelsManager->executeQuery($phql, ['id' => $id,])->getFirst();
-    echo json_encode($user);
+    try {
+        //Instancio los objetos que se van a manejar
+        $request = new Request();
+        $tokens = new Tokens();
+
+        //Consulto si al menos hay un token
+        $token_actual = $tokens->verificar_token($request->get('token'));
+
+        //Si el token existe y esta activo entra a realizar la tabla
+        if ($token_actual > 0) {
+            $perfil = Perfiles::findFirst($id);
+            if (isset($perfil->id)) {
+                echo json_encode($perfil);
+            } else {
+                echo "error";
+            }
+        } else {
+            echo "error";
+        }
+    } catch (Exception $ex) {
+        //retorno el array en json null
+        echo "error_metodo";
+    }
 }
 );
 

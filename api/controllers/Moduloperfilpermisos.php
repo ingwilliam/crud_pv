@@ -44,7 +44,7 @@ $di->set('db', function () use ($config) {
 $app = new Micro($di);
 
 // Recupera todos los registros
-$app->get('/new', function () use ($app) {
+$app->get('/new', function () use ($app,$config) {
 
     try {
         //Instancio los objetos que se van a manejar
@@ -56,29 +56,47 @@ $app->get('/new', function () use ($app) {
 
         //Si el token existe y esta activo entra a realizar la tabla
         if ($token_actual > 0) {
-            //Obtengo los parametros del post
-            $post = $app->request->get();
-            $moduloperfilpermisos = new Moduloperfilpermisos();
+            
+            //Realizo una peticion curl por post para verificar si tiene permisos de escritura
+            $ch = curl_init();
+            curl_setopt($ch,CURLOPT_URL, $config->sistema->url_curl."Session/permiso_escritura");
+            curl_setopt($ch,CURLOPT_POST, 2);
+            curl_setopt($ch,CURLOPT_POSTFIELDS, "modulo=".$request->get('modulo_acceso')."&token=".$request->get('token'));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            $permiso_escritura = curl_exec($ch);
+            curl_close($ch);
+            
+            //Verifico que la respuesta es ok, para poder realizar la escritura
+            if($permiso_escritura=="ok")
+            {            
+                //Obtengo los parametros del post
+                $post = $app->request->get();
+                $moduloperfilpermisos = new Moduloperfilpermisos();
 
-            //Validamos si existe, para eliminar el actual
-            $moduloperfilpermisos_validar = Moduloperfilpermisos::findFirst("perfil = '" . $post["perfil"] . "' AND modulo = '" . $post["modulo"] . "'");
-
-
-            //Valido si el permiso es 0 con el fin de eliminarlo directamente
-            if ($post["permiso"] == "0") {
-                $moduloperfilpermisos_validar->delete();
-                echo "ok";
-            } else {
                 //Validamos si existe, para eliminar el actual
-                if (isset($moduloperfilpermisos_validar->permiso)) {
+                $moduloperfilpermisos_validar = Moduloperfilpermisos::findFirst("perfil = '" . $post["perfil"] . "' AND modulo = '" . $post["modulo"] . "'");
+
+
+                //Valido si el permiso es 0 con el fin de eliminarlo directamente
+                if ($post["permiso"] == "0") {
                     $moduloperfilpermisos_validar->delete();
-                }
-                //Guardamos el registro
-                if ($moduloperfilpermisos->save($post) === false) {
-                    echo "error";
-                } else {
                     echo "ok";
+                } else {
+                    //Validamos si existe, para eliminar el actual
+                    if (isset($moduloperfilpermisos_validar->permiso)) {
+                        $moduloperfilpermisos_validar->delete();
+                    }
+                    //Guardamos el registro
+                    if ($moduloperfilpermisos->save($post) === false) {
+                        echo "error";
+                    } else {
+                        echo "ok";
+                    }
                 }
+            }
+            else
+            {
+                echo "acceso_denegado";
             }
         } else {
             echo "error";

@@ -126,7 +126,7 @@ $app->get('/all', function () use ($app) {
 );
 
 //Crear registro actual
-$app->post('/new', function () use ($app) {
+$app->post('/new', function () use ($app,$config) {
 
     try {
         //Instancio los objetos que se van a manejar
@@ -138,31 +138,49 @@ $app->post('/new', function () use ($app) {
 
         //Si el token existe y esta activo entra a realizar la tabla
         if ($token_actual > 0) {
-            $post = $app->request->getPost();
-            $usuario = new Usuarios();
-            $usuario->active = true;
-            $post["password"] = $this->security->hash($post["password"]);
+            
+            //Realizo una peticion curl por post para verificar si tiene permisos de escritura
+            $ch = curl_init();
+            curl_setopt($ch,CURLOPT_URL, $config->sistema->url_curl."Session/permiso_escritura");
+            curl_setopt($ch,CURLOPT_POST, 2);
+            curl_setopt($ch,CURLOPT_POSTFIELDS, "modulo=".$request->getPut('modulo')."&token=".$request->getPut('token'));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            $permiso_escritura = curl_exec($ch);
+            curl_close($ch);
+            
+            //Verifico que la respuesta es ok, para poder realizar la escritura
+            if($permiso_escritura=="ok")
+            {
+                $post = $app->request->getPost();
+                $usuario = new Usuarios();
+                $usuario->active = true;
+                $post["password"] = $this->security->hash($post["password"]);
 
-            $usuario_validar = Usuarios::findFirst("tipo_documento = '" . $post["tipo_documento"] . "' AND numero_documento = '" . $post["numero_documento"] . "'");
-
-            if (isset($usuario_validar->id)) {
-                echo "error_registro";
-            } else {
-                $usuario_validar = Usuarios::findFirst("username = '" . $post["username"] . "'");
+                $usuario_validar = Usuarios::findFirst("tipo_documento = '" . $post["tipo_documento"] . "' AND numero_documento = '" . $post["numero_documento"] . "'");
 
                 if (isset($usuario_validar->id)) {
-                    echo "error_username";
+                    echo "error_registro";
                 } else {
-                    //Consulto el usuario actual
-                    $user_current = json_decode($token_actual->user_current, true);
-                    $post["creado_por"] = $user_current["id"];
-                    $post["fecha_creacion"] = date("Y-m-d H:i:s");
-                    if ($usuario->save($post) === false) {
-                        echo "error";
+                    $usuario_validar = Usuarios::findFirst("username = '" . $post["username"] . "'");
+
+                    if (isset($usuario_validar->id)) {
+                        echo "error_username";
                     } else {
-                        echo $usuario->id;
+                        //Consulto el usuario actual
+                        $user_current = json_decode($token_actual->user_current, true);
+                        $post["creado_por"] = $user_current["id"];
+                        $post["fecha_creacion"] = date("Y-m-d H:i:s");
+                        if ($usuario->save($post) === false) {
+                            echo "error";
+                        } else {
+                            echo $usuario->id;
+                        }
                     }
                 }
+            }
+            else
+            {
+                echo "acceso_denegado";
             }
         } else {
             echo "error";
@@ -174,7 +192,7 @@ $app->post('/new', function () use ($app) {
 );
 
 // Editar registro actual
-$app->put('/edit/{id:[0-9]+}', function ($id) use ($app) {
+$app->put('/edit/{id:[0-9]+}', function ($id) use ($app,$config) {
     try {
         //Instancio los objetos que se van a manejar
         $request = new Request();
@@ -185,44 +203,62 @@ $app->put('/edit/{id:[0-9]+}', function ($id) use ($app) {
 
         //Si el token existe y esta activo entra a realizar la tabla
         if ($token_actual > 0) {
-            $usuario = $app->request->getPut();
-            if ($usuario["password"] != null && $usuario["password"] != "" && $usuario["password"] != "undefined") {
-                $usuario["password"] = $this->security->hash($usuario["password"]);
-            } else {
-                unset($usuario["password"]);
-            }
-            // Consultar el usuario que se esta editando
-            $usuario_original = Usuarios::findFirst(json_decode($id));
-
-            if (isset($usuario_original->id)) {
-
-                if (( $usuario_original->tipo_documento != $usuario["tipo_documento"] ) || ( $usuario_original->numero_documento != $usuario["numero_documento"] )) {
-                    $usuario_validar = Usuarios::findFirst("tipo_documento = '" . $usuario["tipo_documento"] . "' AND numero_documento = '" . $usuario["numero_documento"] . "'");
-                }
-
-                if (isset($usuario_validar->id)) {
-                    echo "error_registro";
+            
+            //Realizo una peticion curl por post para verificar si tiene permisos de escritura
+            $ch = curl_init();
+            curl_setopt($ch,CURLOPT_URL, $config->sistema->url_curl."Session/permiso_escritura");
+            curl_setopt($ch,CURLOPT_POST, 2);
+            curl_setopt($ch,CURLOPT_POSTFIELDS, "modulo=".$request->getPut('modulo')."&token=".$request->getPut('token'));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            $permiso_escritura = curl_exec($ch);
+            curl_close($ch);
+            
+            //Verifico que la respuesta es ok, para poder realizar la escritura
+            if($permiso_escritura=="ok")
+            {
+                $usuario = $app->request->getPut();
+                if ($usuario["password"] != null && $usuario["password"] != "" && $usuario["password"] != "undefined") {
+                    $usuario["password"] = $this->security->hash($usuario["password"]);
                 } else {
-                    if ($usuario_original->username != $usuario["username"]) {
-                        $usuario_validar = Usuarios::findFirst("username = '" . $usuario["username"] . "'");
+                    unset($usuario["password"]);
+                }
+                // Consultar el usuario que se esta editando
+                $usuario_original = Usuarios::findFirst(json_decode($id));
+
+                if (isset($usuario_original->id)) {
+
+                    if (( $usuario_original->tipo_documento != $usuario["tipo_documento"] ) || ( $usuario_original->numero_documento != $usuario["numero_documento"] )) {
+                        $usuario_validar = Usuarios::findFirst("tipo_documento = '" . $usuario["tipo_documento"] . "' AND numero_documento = '" . $usuario["numero_documento"] . "'");
                     }
 
                     if (isset($usuario_validar->id)) {
-                        echo "error_username";
+                        echo "error_registro";
                     } else {
-                        //Consulto el usuario actual
-                        $user_current = json_decode($token_actual->user_current, true);
-                        $usuario["actualizado_por"] = $user_current["id"];
-                        $usuario["fecha_actualizacion"] = date("Y-m-d H:i:s");
-                        if ($usuario_original->save($usuario) === false) {
-                            echo "error";
+                        if ($usuario_original->username != $usuario["username"]) {
+                            $usuario_validar = Usuarios::findFirst("username = '" . $usuario["username"] . "'");
+                        }
+
+                        if (isset($usuario_validar->id)) {
+                            echo "error_username";
                         } else {
-                            echo $id;
+                            //Consulto el usuario actual
+                            $user_current = json_decode($token_actual->user_current, true);
+                            $usuario["actualizado_por"] = $user_current["id"];
+                            $usuario["fecha_actualizacion"] = date("Y-m-d H:i:s");
+                            if ($usuario_original->save($usuario) === false) {
+                                echo "error";
+                            } else {
+                                echo $id;
+                            }
                         }
                     }
+                } else {
+                    echo "error";
                 }
-            } else {
-                echo "error";
+            }
+            else
+            {
+                echo "acceso_denegado";
             }
         } else {
             echo "error";
@@ -234,26 +270,45 @@ $app->put('/edit/{id:[0-9]+}', function ($id) use ($app) {
 );
 
 // Eliminar registro
-$app->delete('/delete/{id:[0-9]+}', function ($id) use ($app) {
+$app->delete('/delete/{id:[0-9]+}', function ($id) use ($app,$config) {
     try {
         //Instancio los objetos que se van a manejar
         $request = new Request();
         $tokens = new Tokens();
-
         //Consulto si al menos hay un token
         $token_actual = $tokens->verificar_token($request->getPut('token'));
 
         //Si el token existe y esta activo entra a realizar la tabla
         if ($token_actual > 0) {
-            // Consultar el usuario que se esta editando
-            $usuario = Usuarios::findFirst(json_decode($id));
-            // Paso el usuario a inactivo
-            $usuario->active = false;
-            if ($usuario->save($usuario) === false) {
-                echo "error";
-            } else {
-                echo "ok";
+            
+            //Realizo una peticion curl por post para verificar si tiene permisos de escritura
+            $ch = curl_init();
+            curl_setopt($ch,CURLOPT_URL, $config->sistema->url_curl."Session/permiso_escritura");
+            curl_setopt($ch,CURLOPT_POST, 2);
+            curl_setopt($ch,CURLOPT_POSTFIELDS, "modulo=".$request->getPut('modulo')."&token=".$request->getPut('token'));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            $permiso_escritura = curl_exec($ch);
+            curl_close($ch);
+            
+            //Verifico que la respuesta es ok, para poder realizar la escritura
+            if($permiso_escritura=="ok")
+            {
+                // Consultar el usuario que se esta editando
+                $usuario = Usuarios::findFirst(json_decode($id));
+                // Paso el usuario a inactivo
+                $usuario->active = false;
+                if ($usuario->save($usuario) === false) {
+                    echo "error";
+                } else {
+                    echo "ok";
+                }
             }
+            else
+            {
+                echo "acceso_denegado";
+            }
+            
+            exit;                                    
         } else {
             echo "error";
         }
@@ -262,7 +317,7 @@ $app->delete('/delete/{id:[0-9]+}', function ($id) use ($app) {
     }
 });
 
-// Cargo el registro
+//Busca el registro
 $app->get('/search/{id:[0-9]+}', function ($id) use ($app) {
     try {
         //Instancio los objetos que se van a manejar
@@ -274,7 +329,6 @@ $app->get('/search/{id:[0-9]+}', function ($id) use ($app) {
 
         //Si el token existe y esta activo entra a realizar la tabla
         if ($token_actual > 0) {
-            $phql = 'SELECT * FROM Usuarios WHERE id = :id:';
             $usuario = Usuarios::findFirst($id);
             $usuario->password = "undefined";
             if (isset($usuario->id)) {

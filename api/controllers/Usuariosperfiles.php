@@ -44,7 +44,7 @@ $di->set('db', function () use ($config) {
 $app = new Micro($di);
 
 // Recupera todos los registros
-$app->post('/new', function () use ($app) {
+$app->post('/new', function () use ($app,$config) {
     try {
         //Instancio los objetos que se van a manejar
         $request = new Request();
@@ -55,13 +55,30 @@ $app->post('/new', function () use ($app) {
 
         //Si el token existe y esta activo entra a realizar la tabla
         if ($token_actual > 0) {
-
-            $post = $app->request->getPost();
-            $user = new Usuariosperfiles();
-            if ($user->save($post) === false) {
-                echo "error";
-            } else {
-                echo $user->id;
+            
+            //Realizo una peticion curl por post para verificar si tiene permisos de escritura
+            $ch = curl_init();
+            curl_setopt($ch,CURLOPT_URL, $config->sistema->url_curl."Session/permiso_escritura");
+            curl_setopt($ch,CURLOPT_POST, 2);
+            curl_setopt($ch,CURLOPT_POSTFIELDS, "modulo=".$request->getPost('modulo')."&token=".$request->getPost('token'));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            $permiso_escritura = curl_exec($ch);
+            curl_close($ch);
+            
+            //Verifico que la respuesta es ok, para poder realizar la escritura
+            if($permiso_escritura=="ok")
+            {            
+                $post = $app->request->getPost();
+                $user = new Usuariosperfiles();
+                if ($user->save($post) === false) {
+                    echo "error";
+                } else {
+                    echo $user->id;
+                }
+            }
+            else
+            {
+                echo "acceso_denegado";
             }
         } else {
             echo "error";
@@ -73,7 +90,7 @@ $app->post('/new', function () use ($app) {
 );
 
 // Editar registro
-$app->delete('/delete/{user:[0-9]+}/{profile:[0-9]+}', function ($user, $profile) use ($app) {
+$app->delete('/delete/{user:[0-9]+}/{profile:[0-9]+}', function ($user, $profile) use ($app,$config) {
     try {
         //Instancio los objetos que se van a manejar
         $request = new Request();
@@ -85,13 +102,30 @@ $app->delete('/delete/{user:[0-9]+}/{profile:[0-9]+}', function ($user, $profile
         //Si el token existe y esta activo entra a realizar la tabla
         if ($token_actual > 0) {
 
-            // Consultar el usuario que se esta editando
-            $user = Usuariosperfiles::find("usuario = " . $user . " AND perfil=" . $profile);
+            //Realizo una peticion curl por post para verificar si tiene permisos de escritura
+            $ch = curl_init();
+            curl_setopt($ch,CURLOPT_URL, $config->sistema->url_curl."Session/permiso_escritura");
+            curl_setopt($ch,CURLOPT_POST, 2);
+            curl_setopt($ch,CURLOPT_POSTFIELDS, "modulo=".$request->getPut('modulo')."&token=".$request->getPut('token'));
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            $permiso_escritura = curl_exec($ch);
+            curl_close($ch);
+            
+            //Verifico que la respuesta es ok, para poder realizar la escritura
+            if($permiso_escritura=="ok")
+            {            
+                // Consultar el usuario que se esta editando
+                $user = Usuariosperfiles::find("usuario = " . $user . " AND perfil=" . $profile);
 
-            if ($user->delete() === false) {
-                echo "error";
-            } else {
-                echo "ok";
+                if ($user->delete() === false) {
+                    echo "error";
+                } else {
+                    echo "ok";
+                }
+            }
+            else 
+            {
+                echo "acceso_denegado";
             }
         } 
         else 
