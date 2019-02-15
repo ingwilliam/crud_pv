@@ -195,6 +195,36 @@ $app->post('/permiso_lectura', function () use ($app) {
 }
 );
 
+//Verifica permiso de lectura
+$app->post('/cerrar_session', function () use ($app) {
+
+    try {
+        //Instancio los objetos que se van a manejar
+        $request = new Request();
+        $tokens = new Tokens();
+
+        //Consulto si al menos hay un token
+        $token_actual = $tokens->verificar_token($request->getPost('token'));
+
+        //Si el token existe y esta activo entra a realizar la tabla
+        if ($token_actual > 0) {
+            if($token_actual->delete() != false) 
+            {
+                echo "ok";
+            }
+            else
+            {
+                echo "error";
+            }
+        } else {
+            echo "error";
+        }
+    } catch (Exception $ex) {        
+        echo "error_metodo".$ex;
+    }
+}
+);
+
 //Verifica permiso de escritura para los permisos de control total y lectura e escritura
 $app->post('/permiso_escritura', function () use ($app) {
 
